@@ -1,0 +1,81 @@
+Sub PopulateETSheet()
+    Dim wsAngel As Worksheet
+    Dim wsET As Worksheet
+    Dim wsMapping As Worksheet
+    Dim lastRowAngel As Long
+    Dim lastRowMapping As Long
+    Dim i As Long
+    Dim mappingDict As Object
+    Dim colAngel As Object
+    Dim colET As Object
+    
+    ' Set worksheets
+    Set wsAngel = ThisWorkbook.Sheets("AngelSheet")
+    Set wsET = ThisWorkbook.Sheets("ETSheet")
+    Set wsMapping = ThisWorkbook.Sheets("MappingSheet")
+    
+    ' Find the last row in AngelSheet and MappingSheet
+    lastRowAngel = wsAngel.Cells(wsAngel.Rows.Count, "A").End(xlUp).Row
+    lastRowMapping = wsMapping.Cells(wsMapping.Rows.Count, "A").End(xlUp).Row
+    
+    ' Create a dictionary for mapping
+    Set mappingDict = CreateObject("Scripting.Dictionary")
+    For i = 2 To lastRowMapping
+        mappingDict(wsMapping.Cells(i, wsMapping.Rows(1).Find("From").Column).Value) = wsMapping.Cells(i, wsMapping.Rows(1).Find("To").Column).Value
+    Next i
+    
+    ' Create dictionaries for column indices
+    Set colAngel = CreateObject("Scripting.Dictionary")
+    Set colET = CreateObject("Scripting.Dictionary")
+    
+    ' Populate column indices for AngelSheet
+    For i = 1 To wsAngel.Rows(1).Columns.Count
+        colAngel(wsAngel.Cells(1, i).Value) = i
+    Next i
+    
+    ' Populate column indices for ETSheet
+    For i = 1 To wsET.Rows(1).Columns.Count
+        colET(wsET.Cells(1, i).Value) = i
+    Next i
+    
+    ' Populate ETSheet
+    For i = 2 To lastRowAngel
+        With wsET
+            .Cells(i, colET("TransactionType")).Value = wsAngel.Cells(i, colAngel("Buy/Sell")).Value
+            .Cells(i, colET("Exchange")).Value = wsAngel.Cells(i, colAngel("Exchange")).Value
+            .Cells(i, colET("Quantity")).Value = wsAngel.Cells(i, colAngel("Quantity")).Value
+            .Cells(i, colET("STT")).Value = wsAngel.Cells(i, colAngel("STT")).Value
+            .Cells(i, colET("Brokerage")).Value = wsAngel.Cells(i, colAngel("Brokerage")).Value
+            .Cells(i, colET("ServiceCharges")).Value = wsAngel.Cells(i, colAngel("GST")).Value
+            
+            ' Calculate OtherCharges
+            .Cells(i, colET("OtherCharges")).Value = wsAngel.Cells(i, colAngel("Other Charges")).Value + wsAngel.Cells(i, colAngel("Sebi Tax")).Value + wsAngel.Cells(i, colAngel("Exchange Turnover Charges")).Value + wsAngel.Cells(i, colAngel("Stamp Duty")).Value
+            
+            ' Copy Price based on TransactionType
+            If wsAngel.Cells(i, colAngel("Buy/Sell")).Value = "Buy" Then
+                .Cells(i, colET("Price")).Value = wsAngel.Cells(i, colAngel("Buy Price")).Value
+            Else
+                .Cells(i, colET("Price")).Value = wsAngel.Cells(i, colAngel("Sell Price")).Value
+            End If
+            
+            ' Convert Date to Date type
+            .Cells(i, colET("TransactionDate")).Value = DateValue(wsAngel.Cells(i, colAngel("Date")).Value)
+            
+            ' Transform CompanyName using MappingSheet
+            If mappingDict.exists(wsAngel.Cells(i, colAngel("Scrip/Contract")).Value) Then
+                .Cells(i, colET("CompanyName")).Value = mappingDict(wsAngel.Cells(i, colAngel("Scrip/Contract")).Value)
+            Else
+                .Cells(i, colET("CompanyName")).Value = wsAngel.Cells(i, colAngel("Scrip/Contract")).Value
+            End If
+        End With
+    Next i
+    
+    ' Clean up
+    Set mappingDict = Nothing
+    Set colAngel = Nothing
+    Set colET = Nothing
+    Set wsAngel = Nothing
+    Set wsET = Nothing
+    Set wsMapping = Nothing
+End Sub
+
